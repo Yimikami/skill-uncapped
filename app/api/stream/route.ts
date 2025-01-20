@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { setProgress, clearProgress } from "../progress/route";
+import { setProgress, clearProgress } from "@/utils/progress-utils";
 
 async function findLastPart(videoId: string, quality: string): Promise<number> {
   let last = 0;
