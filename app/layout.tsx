@@ -8,9 +8,9 @@ import { Footer } from "@/components/layout/footer";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "SkillUncapped - Educational Project",
+  title: "SkillUncapped",
   description:
-    "A Next.js educational project for learning video streaming implementation",
+    "Stream Skill-Capped courses using a custom video player with enhanced features and improved user experience",
 };
 
 export default function RootLayout({
