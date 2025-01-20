@@ -13,14 +13,16 @@ import {
 import { useState, useRef, useCallback, useEffect } from "react";
 import Hls from "hls.js";
 import { Card, CardContent } from "@/components/ui/card";
-import { VideoIcon } from "lucide-react";
+import { VideoIcon, Download } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Progress } from "@/components/ui/progress";
 
 export default function Home() {
   const [videoUrl, setVideoUrl] = useState("");
+  const [videoId, setVideoId] = useState("");
   const [quality, setQuality] = useState("1500");
   const [isLoading, setIsLoading] = useState(false);
+  const [isDownloading, setIsDownloading] = useState(false);
   const [progress, setProgress] = useState(0);
   const videoRef = useRef<HTMLVideoElement>(null);
   const hlsRef = useRef<Hls | null>(null);
@@ -61,19 +63,27 @@ export default function Home() {
     }
   }, []);
 
+  const handleUrlChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const url = e.target.value;
+    setVideoUrl(url);
+
+    // Extract video ID from URL
+    const match = url.match(/([a-z0-9]{10})(?:\/|$)/);
+    if (match) {
+      setVideoId(match[1]);
+      setVideoUrl(match[1]); // Update input to show only ID
+    }
+  };
+
   const handleStream = async () => {
     if (!videoUrl) return;
     setIsLoading(true);
     setProgress(0);
 
     try {
-      const match = videoUrl.match(/([a-z0-9]{10})(?:\/|$)/);
-      if (!match) {
-        throw new Error("Invalid video URL");
-      }
-
-      const videoId = match[1];
-      startProgressPolling(videoId);
+      const videoIdToUse =
+        videoUrl.match(/([a-z0-9]{10})(?:\/|$)/)?.[1] || videoUrl;
+      startProgressPolling(videoIdToUse);
 
       if (Hls.isSupported() && videoRef.current) {
         if (hlsRef.current) {
@@ -85,7 +95,7 @@ export default function Home() {
           headers: {
             "Content-Type": "application/json",
           },
-          body: JSON.stringify({ videoId, quality }),
+          body: JSON.stringify({ videoId: videoIdToUse, quality }),
         });
 
         if (!response.ok) {
@@ -152,6 +162,59 @@ export default function Home() {
     }
   };
 
+  const handleDownload = async () => {
+    if (!videoUrl) return;
+    setIsDownloading(true);
+    setProgress(0);
+
+    try {
+      const videoIdToUse =
+        videoUrl.match(/([a-z0-9]{10})(?:\/|$)/)?.[1] || videoUrl;
+      startProgressPolling(videoIdToUse);
+
+      const response = await fetch("/api/download", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ videoId: videoIdToUse, quality }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.details || "Failed to download video");
+      }
+
+      // Create a download link
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `video-${quality}.ts`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+
+      toast({
+        title: "Download Complete",
+        description: "Your video has been downloaded successfully.",
+      });
+    } catch (error) {
+      console.error("Download error:", error);
+      toast({
+        title: "Download Error",
+        description:
+          error instanceof Error ? error.message : "Failed to download video",
+        variant: "destructive",
+      });
+    } finally {
+      setIsDownloading(false);
+      stopProgressPolling();
+      setProgress(0);
+    }
+  };
+
   // Cleanup on unmount
   useEffect(() => {
     return () => {
@@ -180,11 +243,9 @@ export default function Home() {
                   <div className="flex-1 flex gap-3">
                     <Input
                       type="url"
-                      placeholder="Enter video URL..."
+                      placeholder="Enter video URL or ID..."
                       value={videoUrl}
-                      onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                        setVideoUrl(e.target.value)
-                      }
+                      onChange={handleUrlChange}
                       className="flex-1 h-11"
                     />
                     <Select value={quality} onValueChange={setQuality}>
@@ -198,27 +259,52 @@ export default function Home() {
                       </SelectContent>
                     </Select>
                   </div>
-                  <Button
-                    onClick={handleStream}
-                    disabled={!videoUrl || isLoading}
-                    size="lg"
-                    className="px-8 transition-all hover:scale-105 shrink-0"
-                  >
-                    {isLoading ? (
-                      <div className="flex items-center gap-2">
-                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                        Loading...
-                      </div>
-                    ) : (
-                      "Stream"
-                    )}
-                  </Button>
+                  <div className="flex gap-2">
+                    <Button
+                      onClick={handleStream}
+                      disabled={!videoUrl || isLoading || isDownloading}
+                      size="lg"
+                      className="px-8 transition-all hover:scale-105 shrink-0"
+                    >
+                      {isLoading ? (
+                        <div className="flex items-center gap-2">
+                          <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                          Loading...
+                        </div>
+                      ) : (
+                        "Stream"
+                      )}
+                    </Button>
+                    <Button
+                      onClick={handleDownload}
+                      disabled={!videoUrl || isLoading || isDownloading}
+                      size="lg"
+                      variant="outline"
+                      className="px-8 transition-all hover:scale-105 shrink-0"
+                    >
+                      {isDownloading ? (
+                        <div className="flex items-center gap-2">
+                          <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+                          Downloading...
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-2">
+                          <Download className="w-4 h-4" />
+                          Download
+                        </div>
+                      )}
+                    </Button>
+                  </div>
                 </div>
 
-                {isLoading && progress > 0 && (
+                {(isLoading || isDownloading) && progress > 0 && (
                   <div className="space-y-2">
                     <div className="flex justify-between text-sm text-muted-foreground">
-                      <span>Processing video...</span>
+                      <span>
+                        {isDownloading
+                          ? "Downloading..."
+                          : "Processing video..."}
+                      </span>
                       <span>{Math.round(progress)}%</span>
                     </div>
                     <Progress value={progress} className="h-2" />
