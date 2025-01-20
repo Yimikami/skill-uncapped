@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-let progressMap = new Map<string, number>();
+const progressMap = new Map<string, number>();
 
 export function GET(req: Request) {
   const url = new URL(req.url);

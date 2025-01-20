@@ -3,7 +3,6 @@ import { setProgress, clearProgress } from "../progress/route";
 
 async function findLastPart(videoId: string, quality: string): Promise<number> {
   let last = 0;
-  let jump = true;
 
   for (let i = 1; i <= 1000; i++) {
     try {

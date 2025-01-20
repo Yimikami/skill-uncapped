@@ -19,7 +19,6 @@ import { Progress } from "@/components/ui/progress";
 
 export default function Home() {
   const [videoUrl, setVideoUrl] = useState("");
-  const [videoId, setVideoId] = useState("");
   const [quality, setQuality] = useState("1500");
   const [isLoading, setIsLoading] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
@@ -95,8 +94,6 @@ export default function Home() {
 
     const videoId = extractVideoId(url);
     if (videoId !== url) {
-      // Only update if a pattern matched
-      setVideoId(videoId);
       setVideoUrl(videoId);
     }
   };
