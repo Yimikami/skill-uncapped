@@ -63,15 +63,41 @@ export default function Home() {
     }
   }, []);
 
+  // Helper function to extract video ID
+  const extractVideoId = useCallback((url: string): string => {
+    // Clean the URL first (remove any leading/trailing spaces and @)
+    const cleanUrl = url.trim().replace(/^@/, "");
+
+    const patterns = [
+      /(?:\/|^)([a-z0-9]{10})(?:\/|$)/, // Original pattern
+      /\/browse\/video\/([a-z0-9]{10})(?:\/|$)/, // browse/video format
+      /\/commentaries\/([a-z0-9]{8,12})(?:\/|$)/, // commentaries format with length validation
+    ];
+
+    for (const pattern of patterns) {
+      const match = cleanUrl.match(pattern);
+      if (match && match[1]) {
+        return match[1];
+      }
+    }
+
+    // If no pattern matches, check if the input itself is a valid ID
+    if (/^[a-z0-9]{8,12}$/.test(cleanUrl)) {
+      return cleanUrl;
+    }
+
+    return url; // Return original if no valid pattern or ID found
+  }, []);
+
   const handleUrlChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const url = e.target.value;
     setVideoUrl(url);
 
-    // Extract video ID from URL
-    const match = url.match(/([a-z0-9]{10})(?:\/|$)/);
-    if (match) {
-      setVideoId(match[1]);
-      setVideoUrl(match[1]); // Update input to show only ID
+    const videoId = extractVideoId(url);
+    if (videoId !== url) {
+      // Only update if a pattern matched
+      setVideoId(videoId);
+      setVideoUrl(videoId);
     }
   };
 
@@ -81,8 +107,7 @@ export default function Home() {
     setProgress(0);
 
     try {
-      const videoIdToUse =
-        videoUrl.match(/([a-z0-9]{10})(?:\/|$)/)?.[1] || videoUrl;
+      const videoIdToUse = extractVideoId(videoUrl);
       startProgressPolling(videoIdToUse);
 
       if (Hls.isSupported() && videoRef.current) {
@@ -168,8 +193,7 @@ export default function Home() {
     setProgress(0);
 
     try {
-      const videoIdToUse =
-        videoUrl.match(/([a-z0-9]{10})(?:\/|$)/)?.[1] || videoUrl;
+      const videoIdToUse = extractVideoId(videoUrl);
       startProgressPolling(videoIdToUse);
 
       const response = await fetch("/api/download", {
@@ -225,112 +249,74 @@ export default function Home() {
   return (
     <div className="min-h-screen flex flex-col bg-background">
       <Header />
-      <main className="flex-1 py-12">
-        <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="max-w-2xl mx-auto space-y-10">
-            <div className="space-y-4 text-center">
-              <h1 className="text-4xl font-bold tracking-tight bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent">
-                Welcome to SkillUncapped
-              </h1>
-              <p className="text-muted-foreground text-lg">
-                Enhance your gaming skills with high-quality educational content
-              </p>
-            </div>
-
-            <Card className="border-2 border-muted">
-              <CardContent className="space-y-6 pt-6">
-                <div className="flex gap-3">
-                  <div className="flex-1 flex gap-3">
-                    <Input
-                      type="url"
-                      placeholder="Enter video URL or ID..."
-                      value={videoUrl}
-                      onChange={handleUrlChange}
-                      className="flex-1 h-11"
-                    />
-                    <Select value={quality} onValueChange={setQuality}>
-                      <SelectTrigger className="w-[120px] h-11 shrink-0">
-                        <SelectValue placeholder="Quality" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="1500">720p</SelectItem>
-                        <SelectItem value="2500">1080p</SelectItem>
-                        <SelectItem value="4500">4K</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="flex gap-2">
-                    <Button
-                      onClick={handleStream}
-                      disabled={!videoUrl || isLoading || isDownloading}
-                      size="lg"
-                      className="px-8 transition-all hover:scale-105 shrink-0"
-                    >
-                      {isLoading ? (
-                        <div className="flex items-center gap-2">
-                          <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                          Loading...
-                        </div>
-                      ) : (
-                        "Stream"
-                      )}
-                    </Button>
-                    <Button
-                      onClick={handleDownload}
-                      disabled={!videoUrl || isLoading || isDownloading}
-                      size="lg"
-                      variant="outline"
-                      className="px-8 transition-all hover:scale-105 shrink-0"
-                    >
-                      {isDownloading ? (
-                        <div className="flex items-center gap-2">
-                          <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-                          Downloading...
-                        </div>
-                      ) : (
-                        <div className="flex items-center gap-2">
-                          <Download className="w-4 h-4" />
-                          Download
-                        </div>
-                      )}
-                    </Button>
-                  </div>
-                </div>
-
-                {(isLoading || isDownloading) && progress > 0 && (
-                  <div className="space-y-2">
-                    <div className="flex justify-between text-sm text-muted-foreground">
-                      <span>
-                        {isDownloading
-                          ? "Downloading..."
-                          : "Processing video..."}
-                      </span>
-                      <span>{Math.round(progress)}%</span>
-                    </div>
-                    <Progress value={progress} className="h-2" />
-                  </div>
-                )}
-
-                <div className="aspect-video bg-muted rounded-lg overflow-hidden relative group">
-                  {!videoRef.current?.src && (
-                    <div className="absolute inset-0 flex items-center justify-center">
-                      <div className="text-muted-foreground flex flex-col items-center gap-2">
-                        <VideoIcon className="w-10 h-10" />
-                        <p>Enter a URL to start streaming</p>
-                      </div>
-                    </div>
-                  )}
-                  <video
-                    ref={videoRef}
-                    className="w-full h-full"
-                    controls
-                    autoPlay
-                    playsInline
-                  />
-                </div>
-              </CardContent>
-            </Card>
+      <main className="flex-1 container mx-auto px-4 py-8 md:py-12 lg:py-16">
+        <div className="max-w-3xl mx-auto space-y-8">
+          <div className="space-y-4">
+            <h1 className="text-2xl md:text-3xl lg:text-4xl font-bold text-center">
+              SkillUncapped Video Player
+            </h1>
+            <p className="text-muted-foreground text-center text-sm md:text-base">
+              Enter a Skill-Capped video URL or ID to start streaming
+            </p>
           </div>
+
+          <Card>
+            <CardContent className="p-6 space-y-4">
+              <div className="flex flex-col md:flex-row gap-4">
+                <Input
+                  placeholder="Enter video URL or ID"
+                  value={videoUrl}
+                  onChange={handleUrlChange}
+                  className="flex-1"
+                />
+                <Select value={quality} onValueChange={setQuality}>
+                  <SelectTrigger className="w-full md:w-[180px]">
+                    <SelectValue placeholder="Select quality" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="720">720p</SelectItem>
+                    <SelectItem value="1500">1080p</SelectItem>
+                    <SelectItem value="2500">1440p</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="flex flex-col sm:flex-row gap-3">
+                <Button
+                  className="flex-1 gap-2"
+                  onClick={handleStream}
+                  disabled={!videoUrl || isLoading}
+                >
+                  <VideoIcon className="h-4 w-4" />
+                  {isLoading ? "Loading..." : "Stream"}
+                </Button>
+                <Button
+                  className="flex-1 gap-2"
+                  onClick={handleDownload}
+                  disabled={!videoUrl || isDownloading}
+                  variant="outline"
+                >
+                  <Download className="h-4 w-4" />
+                  {isDownloading ? "Downloading..." : "Download"}
+                </Button>
+              </div>
+
+              {(isLoading || isDownloading) && (
+                <Progress value={progress} className="w-full" />
+              )}
+            </CardContent>
+          </Card>
+
+          {videoRef && (
+            <div className="aspect-video w-full bg-muted rounded-lg overflow-hidden">
+              <video
+                ref={videoRef}
+                controls
+                className="w-full h-full"
+                playsInline
+              />
+            </div>
+          )}
         </div>
       </main>
     </div>

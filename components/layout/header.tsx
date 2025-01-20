@@ -5,6 +5,8 @@ import Link from "next/link";
 import { useTheme } from "next-themes";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { useEffect, useState } from "react";
+import { Github } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 export function Header() {
   const { theme } = useTheme();
@@ -28,7 +30,18 @@ export function Header() {
                 priority
               />
             </Link>
-            <ThemeToggle />
+            <div className="flex items-center gap-4">
+              <Link
+                href="https://github.com/Yimikami/skill-uncapped"
+                target="_blank"
+              >
+                <Button variant="ghost" size="icon">
+                  <Github className="h-5 w-5" />
+                  <span className="sr-only">GitHub</span>
+                </Button>
+              </Link>
+              <ThemeToggle />
+            </div>
           </div>
         </div>
       </header>
@@ -48,7 +61,18 @@ export function Header() {
               priority
             />
           </Link>
-          <ThemeToggle />
+          <div className="flex items-center gap-4">
+            <Link
+              href="https://github.com/Yimikami/skill-uncapped"
+              target="_blank"
+            >
+              <Button variant="ghost" size="icon">
+                <Github className="h-5 w-5" />
+                <span className="sr-only">GitHub</span>
+              </Button>
+            </Link>
+            <ThemeToggle />
+          </div>
         </div>
       </div>
     </header>
