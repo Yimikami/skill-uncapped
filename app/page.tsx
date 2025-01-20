@@ -10,54 +10,154 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { useState, useRef } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import Hls from "hls.js";
 import { Card, CardContent } from "@/components/ui/card";
 import { VideoIcon } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+import { Progress } from "@/components/ui/progress";
 
 export default function Home() {
   const [videoUrl, setVideoUrl] = useState("");
   const [quality, setQuality] = useState("1500");
   const [isLoading, setIsLoading] = useState(false);
+  const [progress, setProgress] = useState(0);
   const videoRef = useRef<HTMLVideoElement>(null);
   const hlsRef = useRef<Hls | null>(null);
+  const progressIntervalRef = useRef<number | null>(null);
+  const { toast } = useToast();
+
+  const pollProgress = useCallback(async (videoId: string) => {
+    try {
+      const response = await fetch(`/api/progress?id=${videoId}`);
+      if (response.ok) {
+        const data = await response.json();
+        setProgress(data.progress);
+      }
+    } catch (error) {
+      console.error("Error polling progress:", error);
+    }
+  }, []);
+
+  const startProgressPolling = useCallback(
+    (videoId: string) => {
+      // Clear any existing interval
+      if (progressIntervalRef.current !== null) {
+        window.clearInterval(progressIntervalRef.current);
+      }
+      // Poll every 500ms
+      progressIntervalRef.current = window.setInterval(
+        () => pollProgress(videoId),
+        500
+      );
+    },
+    [pollProgress]
+  );
+
+  const stopProgressPolling = useCallback(() => {
+    if (progressIntervalRef.current !== null) {
+      window.clearInterval(progressIntervalRef.current);
+      progressIntervalRef.current = null;
+    }
+  }, []);
 
   const handleStream = async () => {
     if (!videoUrl) return;
     setIsLoading(true);
+    setProgress(0);
 
     try {
-      // Extract video ID from URL
       const match = videoUrl.match(/([a-z0-9]{10})(?:\/|$)/);
       if (!match) {
         throw new Error("Invalid video URL");
       }
 
       const videoId = match[1];
+      startProgressPolling(videoId);
 
       if (Hls.isSupported() && videoRef.current) {
         if (hlsRef.current) {
           hlsRef.current.destroy();
         }
 
+        const response = await fetch("/api/stream", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ videoId, quality }),
+        });
+
+        if (!response.ok) {
+          const error = await response.json();
+          throw new Error(error.details || "Failed to fetch video data");
+        }
+
+        const m3u8Content = await response.text();
+        const blob = new Blob([m3u8Content], { type: "application/x-mpegURL" });
+        const url = URL.createObjectURL(blob);
+
         const hls = new Hls({
           maxBufferSize: 0,
           maxBufferLength: 30,
           startPosition: 0,
+          debug: true,
         });
 
         hlsRef.current = hls;
         hls.attachMedia(videoRef.current);
         hls.on(Hls.Events.MEDIA_ATTACHED, () => {
-          console.log("HLS Media attached");
+          hls.loadSource(url);
+          videoRef.current?.play();
+        });
+
+        hls.on(Hls.Events.ERROR, (_, data) => {
+          console.error("HLS Error:", data);
+          if (data.fatal) {
+            toast({
+              title: "Streaming Error",
+              description: "Failed to load video. Please try again.",
+              variant: "destructive",
+            });
+          }
+        });
+
+        hls.on(Hls.Events.MANIFEST_PARSED, () => {
+          console.log("HLS Manifest parsed");
+          stopProgressPolling();
+        });
+
+        hls.on(Hls.Events.LEVEL_LOADED, () => {
+          console.log("HLS Level loaded");
+        });
+      } else {
+        toast({
+          title: "Browser Not Supported",
+          description: "Please use a modern browser that supports HLS.",
+          variant: "destructive",
         });
       }
     } catch (error) {
       console.error("Streaming error:", error);
+      toast({
+        title: "Error",
+        description:
+          error instanceof Error ? error.message : "Failed to stream video",
+        variant: "destructive",
+      });
     } finally {
       setIsLoading(false);
+      stopProgressPolling();
+      setProgress(0);
     }
   };
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      stopProgressPolling();
+    };
+  }, [stopProgressPolling]);
 
   return (
     <div className="min-h-screen flex flex-col bg-background">
@@ -114,6 +214,16 @@ export default function Home() {
                     )}
                   </Button>
                 </div>
+
+                {isLoading && progress > 0 && (
+                  <div className="space-y-2">
+                    <div className="flex justify-between text-sm text-muted-foreground">
+                      <span>Processing video...</span>
+                      <span>{Math.round(progress)}%</span>
+                    </div>
+                    <Progress value={progress} className="h-2" />
+                  </div>
+                )}
 
                 <div className="aspect-video bg-muted rounded-lg overflow-hidden relative group">
                   {!videoRef.current?.src && (
