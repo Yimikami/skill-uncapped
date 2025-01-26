@@ -20,6 +20,7 @@ export async function GET() {
 
     return NextResponse.json(championCache);
   } catch (error) {
+    console.error(error);
     return NextResponse.json(
       { error: "Failed to fetch champions" },
       { status: 500 }

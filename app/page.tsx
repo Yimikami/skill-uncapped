@@ -7,14 +7,11 @@ import {
   ArrowRight,
   VideoIcon,
   Trophy,
-  Users,
   Zap,
-  BookOpen,
   MonitorPlay,
 } from "lucide-react";
 import Link from "next/link";
 import { Card, CardContent } from "@/components/ui/card";
-import { Footer } from "@/components/layout/footer";
 import { motion } from "framer-motion";
 
 const container = {

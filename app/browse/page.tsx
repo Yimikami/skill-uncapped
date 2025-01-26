@@ -27,13 +27,8 @@ import { useToast } from "@/hooks/use-toast";
 import { Progress } from "@/components/ui/progress";
 import Hls from "hls.js";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@/components/ui/collapsible";
+import { Collapsible, CollapsibleContent } from "@/components/ui/collapsible";
 import { motion } from "framer-motion";
-import { Footer } from "@/components/layout/footer";
 
 interface Video {
   role: string;
@@ -99,12 +94,6 @@ interface CourseData {
   videosToCourses: Record<string, CourseContent>;
 }
 
-const COURSE_URLS = {
-  valorant:
-    "https://d20k8dfo6rtj2t.cloudfront.net/courses_v2/valorant/course_dump_1733423887447.json",
-  lol: "https://d20k8dfo6rtj2t.cloudfront.net/courses_v2/lol/course_dump_1737851539960.json",
-};
-
 const getThumbnailUrl = (uuid: string) => {
   return `https://ik.imagekit.io/skillcapped/thumbnails/${uuid}/thumbnails/thumbnail_39.jpg?tr=w-1440,h-810,cm-extract,bl-1:w-600`;
 };
@@ -168,6 +157,7 @@ export default function BrowsePage() {
         const data: CourseData = await response.json();
         setCourseData(data);
       } catch (error) {
+        console.error(error);
         toast({
           title: "Error",
           description: "Failed to fetch courses. Please try again later.",
@@ -615,20 +605,6 @@ export default function BrowsePage() {
       </CardContent>
     </Card>
   );
-
-  const isCourse = (item: Video | Commentary | Course): item is Course => {
-    return "courseImage" in item && "tags" in item;
-  };
-
-  const isVideo = (item: Video | Commentary | Course): item is Video => {
-    return "durSec" in item && !("staff" in item);
-  };
-
-  const isCommentary = (
-    item: Video | Commentary | Course
-  ): item is Commentary => {
-    return "staff" in item;
-  };
 
   const toggleCourse = (courseId: string) => {
     setExpandedCourses((prev) => ({

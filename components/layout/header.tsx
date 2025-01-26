@@ -8,7 +8,6 @@ import { useEffect, useState } from "react";
 import { Github, VideoIcon, BookOpen, Home, Menu } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { usePathname } from "next/navigation";
-import { cn } from "@/lib/utils";
 import {
   Sheet,
   SheetContent,

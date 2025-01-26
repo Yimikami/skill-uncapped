@@ -16,11 +16,11 @@ import { Card, CardContent } from "@/components/ui/card";
 import { VideoIcon, Download, PlayCircle, Link2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Progress } from "@/components/ui/progress";
-import { Footer } from "@/components/layout/footer";
 import { motion } from "framer-motion";
 
 export default function StreamPage() {
   const [videoUrl, setVideoUrl] = useState("");
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [videoId, setVideoId] = useState("");
   const [quality, setQuality] = useState("1500");
   const [isLoading, setIsLoading] = useState(false);
