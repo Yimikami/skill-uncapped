@@ -20,6 +20,8 @@ import {
   Gamepad2,
   ChevronDown,
   X,
+  Copy,
+  Check,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Progress } from "@/components/ui/progress";
@@ -30,6 +32,8 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
+import { motion } from "framer-motion";
+import { Footer } from "@/components/layout/footer";
 
 interface Video {
   role: string;
@@ -105,6 +109,21 @@ const getThumbnailUrl = (uuid: string) => {
   return `https://ik.imagekit.io/skillcapped/thumbnails/${uuid}/thumbnails/thumbnail_39.jpg?tr=w-1440,h-810,cm-extract,bl-1:w-600`;
 };
 
+const container = {
+  hidden: { opacity: 0 },
+  show: {
+    opacity: 1,
+    transition: {
+      staggerChildren: 0.1,
+    },
+  },
+};
+
+const item = {
+  hidden: { opacity: 0, y: 20 },
+  show: { opacity: 1, y: 0 },
+};
+
 export default function BrowsePage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [quality, setQuality] = useState("1500");
@@ -134,6 +153,7 @@ export default function BrowsePage() {
     Record<string, boolean>
   >({});
   const [roleFilter, setRoleFilter] = useState("ALL");
+  const [copiedId, setCopiedId] = useState<string | null>(null);
 
   const ITEMS_PER_PAGE = 12;
 
@@ -414,6 +434,12 @@ export default function BrowsePage() {
     }
   };
 
+  const handleCopyId = (id: string) => {
+    navigator.clipboard.writeText(id);
+    setCopiedId(id);
+    setTimeout(() => setCopiedId(null), 2000);
+  };
+
   const renderVideoCard = (video: Video) => (
     <Card key={video.uuid} className="overflow-hidden">
       <CardContent className="p-0">
@@ -427,7 +453,21 @@ export default function BrowsePage() {
           }}
         />
         <div className="p-4 space-y-4">
-          <h3 className="font-semibold text-lg">{video.title}</h3>
+          <div className="flex justify-between items-start gap-2">
+            <h3 className="font-semibold text-lg">{video.title}</h3>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => handleCopyId(video.uuid)}
+              className="shrink-0"
+            >
+              {copiedId === video.uuid ? (
+                <Check className="h-4 w-4" />
+              ) : (
+                <Copy className="h-4 w-4" />
+              )}
+            </Button>
+          </div>
           {video.desc && (
             <p className="text-sm text-muted-foreground line-clamp-2">
               {video.desc}
@@ -491,10 +531,24 @@ export default function BrowsePage() {
         />
         <div className="p-4 space-y-4">
           <div className="space-y-2">
-            <h3 className="font-semibold text-lg">
-              {commentary.yourChampion &&
-                commentary.yourChampion + " vs " + commentary.theirChampion}
-            </h3>
+            <div className="flex justify-between items-start gap-2">
+              <h3 className="font-semibold text-lg">
+                {commentary.yourChampion &&
+                  commentary.yourChampion + " vs " + commentary.theirChampion}
+              </h3>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => handleCopyId(commentary.uuid)}
+                className="shrink-0"
+              >
+                {copiedId === commentary.uuid ? (
+                  <Check className="h-4 w-4" />
+                ) : (
+                  <Copy className="h-4 w-4" />
+                )}
+              </Button>
+            </div>
             <div className="grid grid-cols-2 gap-2 text-sm">
               {commentary.gameTime && (
                 <div>
@@ -611,190 +665,227 @@ export default function BrowsePage() {
     };
   }, []);
 
+  // Set activeTab to "courses" when game changes to valorant
+  useEffect(() => {
+    if (selectedGame === "valorant") {
+      setActiveTab("courses");
+    }
+  }, [selectedGame]);
+
   return (
     <div className="min-h-screen bg-background">
       <Header />
-      <main className="container mx-auto px-4 py-8">
-        <div className="flex flex-col space-y-6">
-          <div className="flex flex-col md:flex-row gap-4 items-center justify-between">
-            <div className="flex gap-4 flex-1 flex-wrap">
-              <Input
-                placeholder="Search..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="max-w-md"
-              />
-              <Select
-                value={selectedGame}
-                onValueChange={(value: "lol" | "valorant") =>
-                  setSelectedGame(value)
-                }
-              >
-                <SelectTrigger className="w-[180px]">
-                  <SelectValue placeholder="Select game" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="lol">League of Legends</SelectItem>
-                  <SelectItem value="valorant">Valorant</SelectItem>
-                </SelectContent>
-              </Select>
-              {selectedGame === "lol" && activeTab === "courses" && (
-                <Select value={roleFilter} onValueChange={setRoleFilter}>
-                  <SelectTrigger className="w-[180px]">
-                    <SelectValue placeholder="Select role" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="ALL">All Roles</SelectItem>
-                    <SelectItem value="Mid">Mid</SelectItem>
-                    <SelectItem value="Jungle">Jungle</SelectItem>
-                    <SelectItem value="Top">Top</SelectItem>
-                    <SelectItem value="ADC">ADC</SelectItem>
-                    <SelectItem value="Support">Support</SelectItem>
-                  </SelectContent>
-                </Select>
-              )}
-              {activeTab === "commentaries" && selectedGame === "lol" && (
-                <>
-                  <Select
-                    value={yourChampionFilter}
-                    onValueChange={setYourChampionFilter}
-                  >
-                    <SelectTrigger className="w-[180px]">
-                      <SelectValue placeholder="Your Champion" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="ANY">Any Champion</SelectItem>
-                      {champions.map((champion) => (
-                        <SelectItem
-                          key={champion.name}
-                          value={champion.name.toLowerCase()}
-                        >
-                          {champion.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <Select
-                    value={theirChampionFilter}
-                    onValueChange={setTheirChampionFilter}
-                  >
-                    <SelectTrigger className="w-[180px]">
-                      <SelectValue placeholder="Enemy Champion" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="ANY">Any Champion</SelectItem>
-                      {champions.map((champion) => (
-                        <SelectItem
-                          key={champion.name}
-                          value={champion.name.toLowerCase()}
-                        >
-                          {champion.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </>
-              )}
-              {(searchQuery ||
-                roleFilter !== "ALL" ||
-                yourChampionFilter !== "ANY" ||
-                theirChampionFilter !== "ANY") && (
-                <Button
-                  variant="outline"
-                  onClick={clearFilters}
-                  className="gap-2"
-                >
-                  Clear Filters
-                  <X className="h-4 w-4" />
-                </Button>
-              )}
+      <main className="container mx-auto px-4 py-8 md:py-12">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="flex flex-col space-y-8"
+        >
+          {/* Hero Section */}
+          <div className="text-center space-y-4">
+            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 text-primary text-sm font-medium">
+              <Gamepad2 className="h-4 w-4" />
+              <span>
+                {selectedGame === "lol" ? "League of Legends" : "Valorant"}{" "}
+                Content
+              </span>
             </div>
-            <Select value={quality} onValueChange={setQuality}>
-              <SelectTrigger className="w-[180px]">
-                <SelectValue placeholder="Select quality" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="720">720p</SelectItem>
-                <SelectItem value="1500">1080p</SelectItem>
-                <SelectItem value="2500">1440p</SelectItem>
-              </SelectContent>
-            </Select>
+            <h1 className="text-3xl md:text-4xl font-bold tracking-tight">
+              Browse Library
+            </h1>
           </div>
 
           <Tabs
             value={activeTab}
             onValueChange={setActiveTab}
-            className="w-full"
+            className="w-full space-y-6"
           >
-            <TabsList
-              className={
-                selectedGame === "lol"
-                  ? "grid w-full grid-cols-2"
-                  : "grid w-full grid-cols-1"
-              }
-            >
-              <TabsTrigger value="courses">
-                Courses ({filteredContent.courses.length})
-              </TabsTrigger>
-              {selectedGame === "lol" && (
-                <TabsTrigger value="commentaries">
-                  Commentaries ({filteredContent.commentaries.length})
-                </TabsTrigger>
+            {/* Main Navigation */}
+            <div className="flex flex-col md:flex-row gap-6 items-center justify-between">
+              {selectedGame === "lol" ? (
+                <TabsList className="h-10">
+                  <TabsTrigger value="courses" className="text-base">
+                    Courses ({filteredContent.courses.length})
+                  </TabsTrigger>
+                  <TabsTrigger value="commentaries" className="text-base">
+                    Commentaries ({filteredContent.commentaries.length})
+                  </TabsTrigger>
+                </TabsList>
+              ) : (
+                <div className="text-lg font-medium">
+                  Courses ({filteredContent.courses.length})
+                </div>
               )}
-            </TabsList>
 
-            {isFetchingCourses ? (
-              <div className="text-center py-8">Loading content...</div>
-            ) : (
-              <>
-                <TabsContent value="courses">
-                  <div className="space-y-6">
-                    {(paginatedContent as Course[]).map((course) => (
-                      <Collapsible
-                        key={course.uuid}
-                        open={expandedCourses[course.uuid]}
-                        onOpenChange={() => toggleCourse(course.uuid)}
+              <div className="flex flex-wrap gap-4 items-center">
+                <div className="flex items-center gap-2 overflow-x-auto pb-2 -mb-2">
+                  <Select
+                    value={selectedGame}
+                    onValueChange={(value: "lol" | "valorant") =>
+                      setSelectedGame(value)
+                    }
+                  >
+                    <SelectTrigger className="w-[180px]">
+                      <SelectValue placeholder="Select game" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="lol">League of Legends</SelectItem>
+                      <SelectItem value="valorant">Valorant</SelectItem>
+                    </SelectContent>
+                  </Select>
+
+                  <Select value={quality} onValueChange={setQuality}>
+                    <SelectTrigger className="w-[180px]">
+                      <SelectValue placeholder="Select quality" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="720">720p</SelectItem>
+                      <SelectItem value="1500">1080p</SelectItem>
+                      <SelectItem value="2500">1440p</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            </div>
+
+            {/* Filters */}
+            <Card className="border shadow-sm">
+              <CardContent className="p-4">
+                <div className="flex flex-wrap gap-4 items-center">
+                  <div className="flex-1 min-w-[200px]">
+                    <Input
+                      placeholder="Search content..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="w-full"
+                    />
+                  </div>
+
+                  {selectedGame === "lol" && activeTab === "courses" && (
+                    <Select value={roleFilter} onValueChange={setRoleFilter}>
+                      <SelectTrigger className="w-[160px]">
+                        <SelectValue placeholder="Role" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="ALL">All Roles</SelectItem>
+                        <SelectItem value="Mid">Mid</SelectItem>
+                        <SelectItem value="Jungle">Jungle</SelectItem>
+                        <SelectItem value="Top">Top</SelectItem>
+                        <SelectItem value="ADC">ADC</SelectItem>
+                        <SelectItem value="Support">Support</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  )}
+
+                  {activeTab === "commentaries" && selectedGame === "lol" && (
+                    <div className="flex flex-row md:gap-3">
+                      <Select
+                        value={yourChampionFilter}
+                        onValueChange={setYourChampionFilter}
                       >
-                        <Card>
+                        <SelectTrigger className="w-[160px]">
+                          <SelectValue placeholder="Your Champion" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="ANY">Any Champion</SelectItem>
+                          {champions.map((champion) => (
+                            <SelectItem
+                              key={champion.name}
+                              value={champion.name.toLowerCase()}
+                            >
+                              {champion.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <Select
+                        value={theirChampionFilter}
+                        onValueChange={setTheirChampionFilter}
+                      >
+                        <SelectTrigger className="w-[160px]">
+                          <SelectValue placeholder="Enemy Champion" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="ANY">Any Champion</SelectItem>
+                          {champions.map((champion) => (
+                            <SelectItem
+                              key={champion.name}
+                              value={champion.name.toLowerCase()}
+                            >
+                              {champion.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
+
+                  {(searchQuery ||
+                    roleFilter !== "ALL" ||
+                    yourChampionFilter !== "ANY" ||
+                    theirChampionFilter !== "ANY") && (
+                    <Button
+                      variant="outline"
+                      onClick={clearFilters}
+                      className="gap-2 hover:bg-destructive hover:text-destructive-foreground"
+                    >
+                      <X className="h-4 w-4" />
+                      Clear Filters
+                    </Button>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Content */}
+            {isFetchingCourses ? (
+              <div className="text-center py-16">
+                <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 text-primary">
+                  <span className="animate-spin">◌</span>
+                  Loading content...
+                </div>
+              </div>
+            ) : (
+              <motion.div
+                variants={container}
+                initial="hidden"
+                animate="show"
+                className="space-y-6"
+              >
+                <TabsContent value="courses">
+                  <div className="grid grid-cols-1 gap-6">
+                    {(paginatedContent as Course[]).map((course) => (
+                      <motion.div key={course.uuid} variants={item}>
+                        <Card className="overflow-hidden hover:shadow-lg transition-all duration-300">
                           <CardContent className="p-0">
-                            <div className="flex items-start gap-4 p-4">
-                              <img
-                                src={
-                                  course.courseImage3 ||
-                                  course.courseImage2 ||
-                                  course.courseImage ||
-                                  `https://placehold.co/600x400?text=${encodeURIComponent(
-                                    course.title
-                                  )}`
-                                }
-                                alt={course.title}
-                                className="w-48 aspect-video object-cover rounded-md"
-                              />
-                              <div className="flex-1">
-                                <div
-                                  className="flex items-center justify-between cursor-pointer"
-                                  onClick={() => toggleCourse(course.uuid)}
-                                >
-                                  <div className="space-y-2 flex-1">
-                                    <div className="flex items-center gap-2">
-                                      <h3 className="font-semibold text-lg">
-                                        {course.title}
-                                      </h3>
-                                      <span className="text-sm text-muted-foreground">
-                                        ({course.videos?.length || 0} videos)
-                                      </span>
-                                    </div>
-                                    {course.desc && (
-                                      <p className="text-sm text-muted-foreground">
-                                        {course.desc}
-                                      </p>
-                                    )}
-                                    {course.tags && course.tags.length > 0 && (
-                                      <div className="flex flex-wrap gap-2">
+                            <div className="md:flex">
+                              <div className="relative md:w-1/3 lg:w-1/4">
+                                <img
+                                  src={
+                                    course.courseImage3 ||
+                                    course.courseImage2 ||
+                                    course.courseImage
+                                  }
+                                  alt={course.title}
+                                  className="w-full aspect-video object-cover rounded-lg object-top"
+                                />
+                                <div className="absolute inset-0 bg-gradient-to-t from-background/80 to-transparent md:hidden" />
+                              </div>
+                              <div className="p-6 flex-1">
+                                <div className="flex items-start justify-between gap-4">
+                                  <div className="space-y-2">
+                                    <h3 className="text-xl font-semibold">
+                                      {course.title}
+                                    </h3>
+                                    <p className="text-sm text-muted-foreground line-clamp-2">
+                                      {course.desc}
+                                    </p>
+                                    {course.tags && (
+                                      <div className="flex flex-wrap gap-2 pt-2">
                                         {course.tags.map((tag) => (
                                           <span
                                             key={tag}
-                                            className="text-xs bg-muted px-2 py-1 rounded-full"
+                                            className="text-xs bg-primary/10 text-primary px-2 py-1 rounded-full"
                                           >
                                             {tag}
                                           </span>
@@ -802,43 +893,52 @@ export default function BrowsePage() {
                                       </div>
                                     )}
                                   </div>
-                                  <CollapsibleTrigger asChild>
-                                    <Button variant="ghost" size="icon">
-                                      <ChevronDown
-                                        className={`h-4 w-4 transition-transform duration-200 ${
-                                          expandedCourses[course.uuid]
-                                            ? "transform rotate-180"
-                                            : ""
-                                        }`}
-                                      />
-                                    </Button>
-                                  </CollapsibleTrigger>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={() => toggleCourse(course.uuid)}
+                                    className="shrink-0"
+                                  >
+                                    <ChevronDown
+                                      className={`h-4 w-4 transition-transform duration-200 ${
+                                        expandedCourses[course.uuid]
+                                          ? "rotate-180"
+                                          : ""
+                                      }`}
+                                    />
+                                  </Button>
                                 </div>
                               </div>
                             </div>
-                            <CollapsibleContent>
-                              <div className="border-t">
-                                <div className="p-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                                  {course.videos?.map((video) =>
-                                    renderVideoCard(video)
-                                  )}
+                            <Collapsible open={expandedCourses[course.uuid]}>
+                              <CollapsibleContent>
+                                <div className="border-t">
+                                  <div className="p-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                                    {course.videos?.map((video) =>
+                                      renderVideoCard(video)
+                                    )}
+                                  </div>
                                 </div>
-                              </div>
-                            </CollapsibleContent>
+                              </CollapsibleContent>
+                            </Collapsible>
                           </CardContent>
                         </Card>
-                      </Collapsible>
+                      </motion.div>
                     ))}
                   </div>
                 </TabsContent>
 
-                <TabsContent value="commentaries">
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                    {(paginatedContent as Commentary[]).map((commentary) =>
-                      renderCommentaryCard(commentary)
-                    )}
-                  </div>
-                </TabsContent>
+                {selectedGame === "lol" && (
+                  <TabsContent value="commentaries">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                      {(paginatedContent as Commentary[]).map((commentary) => (
+                        <motion.div key={commentary.uuid} variants={item}>
+                          {renderCommentaryCard(commentary)}
+                        </motion.div>
+                      ))}
+                    </div>
+                  </TabsContent>
+                )}
 
                 {totalPages > 1 && (
                   <div className="flex justify-center items-center gap-4 mt-8">
@@ -846,27 +946,27 @@ export default function BrowsePage() {
                       variant="outline"
                       onClick={() => handlePageChange(currentPage - 1)}
                       disabled={currentPage === 1}
+                      className="gap-2"
                     >
-                      <ChevronLeft className="h-4 w-4" />
-                      Previous
+                      <ChevronLeft className="h-4 w-4" /> Previous
                     </Button>
-                    <span className="text-sm">
+                    <span className="text-sm font-medium">
                       Page {currentPage} of {totalPages}
                     </span>
                     <Button
                       variant="outline"
                       onClick={() => handlePageChange(currentPage + 1)}
                       disabled={currentPage === totalPages}
+                      className="gap-2"
                     >
-                      Next
-                      <ChevronRight className="h-4 w-4" />
+                      Next <ChevronRight className="h-4 w-4" />
                     </Button>
                   </div>
                 )}
-              </>
+              </motion.div>
             )}
           </Tabs>
-        </div>
+        </motion.div>
       </main>
     </div>
   );

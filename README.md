@@ -6,16 +6,20 @@ A modern Next.js 15 application that provides an alternative interface for acces
 
 This project is created for **educational purposes only** as a learning exercise in modern web development technologies.
 
-This is an unofficial project and is not affiliated with, endorsed by, or connected to Skill-Capped in any way. The project is intended solely for educational and learning purposes. Any resemblance to existing platforms is purely coincidental and serves only as a learning reference.
+This is an unofficial project and is not affiliated with, endorsed by, or connected to Skill-Capped in any way. All videos, commentaries, and courses are
+property of Skill-Capped. The project is intended solely for educational and learning purposes. Any resemblance to existing platforms is purely coincidental and serves only as a learning reference.
 
 ## Features
 
-- 🎮 Stream Skill-Capped educational gaming content
-- 🎥 Video quality selection (720p, 1080p, 4K)
+- 🎮 Browse League of Legends and Valorant courses and commentaries
+- 🎥 Filter courses by role, champion, and search terms
+- 🎥 Stream courses, videos and commentaries from all Skill-Capped games (LoL, Valorant, WoW, etc)
+- 🎬 Video quality selection (720p, 1080p, 1440p)
 - 🌓 Dark/Light mode support
-- 📱 Responsive design
-- ⚡ Fast and optimized video streaming
+- 📱 Responsive design for all devices
+- ⚡ Fast and optimized video streaming with HLS.js
 - 🔒 Secure video processing
+- 📥 Download videos and commentaries easily
 
 ## Tech Stack
 
@@ -38,7 +42,7 @@ This is an unofficial project and is not affiliated with, endorsed by, or connec
 1. Clone the repository:
 
 ```bash
-git clone https://github.com/yourusername/skill-uncapped.git
+git clone https://github.com/Yimikami/skill-uncapped.git
 cd skill-uncapped
 ```
 
