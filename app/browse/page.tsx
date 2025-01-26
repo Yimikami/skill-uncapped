@@ -18,11 +18,18 @@ import {
   ChevronLeft,
   ChevronRight,
   Gamepad2,
+  ChevronDown,
+  X,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Progress } from "@/components/ui/progress";
 import Hls from "hls.js";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 
 interface Video {
   role: string;
@@ -123,6 +130,10 @@ export default function BrowsePage() {
   const [champions, setChampions] = useState<{ name: string }[]>([]);
   const [yourChampionFilter, setYourChampionFilter] = useState("ANY");
   const [theirChampionFilter, setTheirChampionFilter] = useState("ANY");
+  const [expandedCourses, setExpandedCourses] = useState<
+    Record<string, boolean>
+  >({});
+  const [roleFilter, setRoleFilter] = useState("ALL");
 
   const ITEMS_PER_PAGE = 12;
 
@@ -176,11 +187,11 @@ export default function BrowsePage() {
   }, []);
 
   const filteredContent = {
-    courses: courseData.courses.filter((course) =>
-      course.title.toLowerCase().includes(searchQuery.toLowerCase())
-    ),
-    videos: courseData.videos.filter((video) =>
-      video.title.toLowerCase().includes(searchQuery.toLowerCase())
+    courses: courseData.courses.filter(
+      (course) =>
+        course.title.toLowerCase().includes(searchQuery.toLowerCase()) &&
+        (roleFilter === "ALL" ||
+          course.role.toLowerCase() === roleFilter.toLowerCase())
     ),
     commentaries: courseData.commentaries.filter(
       (commentary) =>
@@ -250,7 +261,15 @@ export default function BrowsePage() {
     try {
       startProgressPolling(videoId);
 
-      if (Hls.isSupported() && videoRefs.current[videoId]) {
+      // Create video element if it doesn't exist
+      if (!videoRefs.current[videoId]) {
+        videoRefs.current[videoId] = document.createElement("video");
+        videoRefs.current[videoId]!.controls = true;
+        videoRefs.current[videoId]!.className = "w-full h-full";
+        videoRefs.current[videoId]!.playsInline = true;
+      }
+
+      if (Hls.isSupported()) {
         if (hlsRefs.current[videoId]) {
           hlsRefs.current[videoId]!.destroy();
         }
@@ -287,6 +306,7 @@ export default function BrowsePage() {
         });
 
         hls.on(Hls.Events.ERROR, (_, data) => {
+          console.error("HLS Error:", data);
           if (data.fatal) {
             toast({
               title: "Streaming Error",
@@ -298,15 +318,40 @@ export default function BrowsePage() {
 
         hls.on(Hls.Events.MANIFEST_PARSED, () => {
           stopProgressPolling(videoId);
+          // Force a re-render to show the video element
+          setIsLoading((prev) => ({ ...prev }));
         });
+      } else if (
+        videoRefs.current[videoId]?.canPlayType("application/vnd.apple.mpegurl")
+      ) {
+        // For Safari which has built-in HLS support
+        const response = await fetch("/api/stream", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ videoId, quality }),
+        });
+
+        if (!response.ok) {
+          const error = await response.json();
+          throw new Error(error.details || "Failed to fetch video data");
+        }
+
+        const m3u8Content = await response.text();
+        const blob = new Blob([m3u8Content], { type: "application/x-mpegURL" });
+        const url = URL.createObjectURL(blob);
+
+        videoRefs.current[videoId]!.src = url;
+        await videoRefs.current[videoId]?.play();
+        stopProgressPolling(videoId);
+        // Force a re-render to show the video element
+        setIsLoading((prev) => ({ ...prev }));
       } else {
-        toast({
-          title: "Browser Not Supported",
-          description: "Please use a modern browser that supports HLS.",
-          variant: "destructive",
-        });
+        throw new Error("Your browser does not support HLS playback");
       }
     } catch (error) {
+      console.error("Streaming error:", error);
       toast({
         title: "Error",
         description:
@@ -355,6 +400,7 @@ export default function BrowsePage() {
         description: "Your video has been downloaded successfully.",
       });
     } catch (error) {
+      console.error("Download error:", error);
       toast({
         title: "Download Error",
         description:
@@ -387,9 +433,10 @@ export default function BrowsePage() {
               {video.desc}
             </p>
           )}
-          <div className="flex items-center justify-between text-sm text-muted-foreground">
-            <span>Role: {video.role}</span>
-            <span>Duration: {Math.floor(video.durSec / 60)}min</span>
+          <div className="flex flex-col gap-2 text-sm text-muted-foreground">
+            <div className="flex justify-between">
+              <span>Duration: {Math.floor(video.durSec / 60)}min</span>
+            </div>
           </div>
           <div className="flex flex-col sm:flex-row gap-2">
             <Button
@@ -529,13 +576,48 @@ export default function BrowsePage() {
     return "staff" in item;
   };
 
+  const toggleCourse = (courseId: string) => {
+    setExpandedCourses((prev) => ({
+      ...prev,
+      [courseId]: !prev[courseId],
+    }));
+  };
+
+  const clearFilters = () => {
+    setSearchQuery("");
+    setRoleFilter("ALL");
+    setYourChampionFilter("ANY");
+    setTheirChampionFilter("ANY");
+  };
+
+  useEffect(() => {
+    clearFilters();
+    setCurrentPage(1);
+  }, [activeTab, selectedGame]);
+
+  useEffect(() => {
+    return () => {
+      // Cleanup all intervals and HLS instances on unmount
+      Object.keys(progressIntervalRefs.current).forEach((videoId) => {
+        if (progressIntervalRefs.current[videoId] !== null) {
+          window.clearInterval(progressIntervalRefs.current[videoId]!);
+        }
+      });
+      Object.keys(hlsRefs.current).forEach((videoId) => {
+        if (hlsRefs.current[videoId]) {
+          hlsRefs.current[videoId]!.destroy();
+        }
+      });
+    };
+  }, []);
+
   return (
     <div className="min-h-screen bg-background">
       <Header />
       <main className="container mx-auto px-4 py-8">
         <div className="flex flex-col space-y-6">
           <div className="flex flex-col md:flex-row gap-4 items-center justify-between">
-            <div className="flex gap-4 flex-1">
+            <div className="flex gap-4 flex-1 flex-wrap">
               <Input
                 placeholder="Search..."
                 value={searchQuery}
@@ -556,6 +638,21 @@ export default function BrowsePage() {
                   <SelectItem value="valorant">Valorant</SelectItem>
                 </SelectContent>
               </Select>
+              {selectedGame === "lol" && activeTab === "courses" && (
+                <Select value={roleFilter} onValueChange={setRoleFilter}>
+                  <SelectTrigger className="w-[180px]">
+                    <SelectValue placeholder="Select role" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="ALL">All Roles</SelectItem>
+                    <SelectItem value="Mid">Mid</SelectItem>
+                    <SelectItem value="Jungle">Jungle</SelectItem>
+                    <SelectItem value="Top">Top</SelectItem>
+                    <SelectItem value="ADC">ADC</SelectItem>
+                    <SelectItem value="Support">Support</SelectItem>
+                  </SelectContent>
+                </Select>
+              )}
               {activeTab === "commentaries" && selectedGame === "lol" && (
                 <>
                   <Select
@@ -598,6 +695,19 @@ export default function BrowsePage() {
                   </Select>
                 </>
               )}
+              {(searchQuery ||
+                roleFilter !== "ALL" ||
+                yourChampionFilter !== "ANY" ||
+                theirChampionFilter !== "ANY") && (
+                <Button
+                  variant="outline"
+                  onClick={clearFilters}
+                  className="gap-2"
+                >
+                  Clear Filters
+                  <X className="h-4 w-4" />
+                </Button>
+              )}
             </div>
             <Select value={quality} onValueChange={setQuality}>
               <SelectTrigger className="w-[180px]">
@@ -619,15 +729,12 @@ export default function BrowsePage() {
             <TabsList
               className={
                 selectedGame === "lol"
-                  ? "grid w-full grid-cols-3"
-                  : "grid w-full grid-cols-2"
+                  ? "grid w-full grid-cols-2"
+                  : "grid w-full grid-cols-1"
               }
             >
               <TabsTrigger value="courses">
                 Courses ({filteredContent.courses.length})
-              </TabsTrigger>
-              <TabsTrigger value="videos">
-                Videos ({filteredContent.videos.length})
               </TabsTrigger>
               {selectedGame === "lol" && (
                 <TabsTrigger value="commentaries">
@@ -641,109 +748,87 @@ export default function BrowsePage() {
             ) : (
               <>
                 <TabsContent value="courses">
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                  <div className="space-y-6">
                     {(paginatedContent as Course[]).map((course) => (
-                      <Card key={course.uuid} className="overflow-hidden">
-                        <CardContent className="p-0">
-                          <img
-                            src={
-                              course.courseImage3 ||
-                              `https://placehold.co/600x400?text=${encodeURIComponent(
-                                course.title
-                              )}`
-                            }
-                            alt={course.title}
-                            className="w-full aspect-video object-cover"
-                          />
-                          <div className="p-4 space-y-4">
-                            <h3 className="font-semibold text-lg">
-                              {course.title}
-                            </h3>
-                            {course.desc && (
-                              <p className="text-sm text-muted-foreground line-clamp-2">
-                                {course.desc}
-                              </p>
-                            )}
-                            {course.tags && (
-                              <div className="flex flex-wrap gap-2">
-                                {course.tags.map((tag: string) => (
-                                  <span
-                                    key={tag}
-                                    className="text-xs bg-muted px-2 py-1 rounded-full"
-                                  >
-                                    {tag}
-                                  </span>
-                                ))}
-                              </div>
-                            )}
-                            {course.chapters && (
-                              <div className="space-y-2">
-                                {course.chapters.map((chapter, index) => (
-                                  <div key={index} className="space-y-1">
-                                    <h4 className="font-medium text-sm">
-                                      {chapter.title}
-                                    </h4>
-                                    <p className="text-xs text-muted-foreground">
-                                      {chapter.vids.length} videos
-                                    </p>
-                                  </div>
-                                ))}
-                              </div>
-                            )}
-                            <div className="flex flex-col sm:flex-row gap-2">
-                              <Button
-                                className="flex-1 gap-2"
-                                onClick={() => handleStream(course.uuid)}
-                                disabled={isLoading[course.uuid]}
-                              >
-                                <VideoIcon className="h-4 w-4" />
-                                {isLoading[course.uuid]
-                                  ? "Loading..."
-                                  : "Stream"}
-                              </Button>
-                              <Button
-                                className="flex-1 gap-2"
-                                onClick={() => handleDownload(course.uuid)}
-                                disabled={isDownloading[course.uuid]}
-                                variant="outline"
-                              >
-                                <Download className="h-4 w-4" />
-                                {isDownloading[course.uuid]
-                                  ? "Downloading..."
-                                  : "Download"}
-                              </Button>
-                            </div>
-                            {(isLoading[course.uuid] ||
-                              isDownloading[course.uuid]) && (
-                              <Progress
-                                value={progress[course.uuid] || 0}
-                                className="w-full"
+                      <Collapsible
+                        key={course.uuid}
+                        open={expandedCourses[course.uuid]}
+                        onOpenChange={() => toggleCourse(course.uuid)}
+                      >
+                        <Card>
+                          <CardContent className="p-0">
+                            <div className="flex items-start gap-4 p-4">
+                              <img
+                                src={
+                                  course.courseImage3 ||
+                                  course.courseImage2 ||
+                                  course.courseImage ||
+                                  `https://placehold.co/600x400?text=${encodeURIComponent(
+                                    course.title
+                                  )}`
+                                }
+                                alt={course.title}
+                                className="w-48 aspect-video object-cover rounded-md"
                               />
-                            )}
-                            {videoRefs.current[course.uuid] && (
-                              <div className="aspect-video w-full bg-muted rounded-lg overflow-hidden">
-                                <video
-                                  ref={(el) => {
-                                    videoRefs.current[course.uuid] = el;
-                                  }}
-                                  controls
-                                  className="w-full h-full"
-                                  playsInline
-                                />
+                              <div className="flex-1">
+                                <div
+                                  className="flex items-center justify-between cursor-pointer"
+                                  onClick={() => toggleCourse(course.uuid)}
+                                >
+                                  <div className="space-y-2 flex-1">
+                                    <div className="flex items-center gap-2">
+                                      <h3 className="font-semibold text-lg">
+                                        {course.title}
+                                      </h3>
+                                      <span className="text-sm text-muted-foreground">
+                                        ({course.videos?.length || 0} videos)
+                                      </span>
+                                    </div>
+                                    {course.desc && (
+                                      <p className="text-sm text-muted-foreground">
+                                        {course.desc}
+                                      </p>
+                                    )}
+                                    {course.tags && course.tags.length > 0 && (
+                                      <div className="flex flex-wrap gap-2">
+                                        {course.tags.map((tag) => (
+                                          <span
+                                            key={tag}
+                                            className="text-xs bg-muted px-2 py-1 rounded-full"
+                                          >
+                                            {tag}
+                                          </span>
+                                        ))}
+                                      </div>
+                                    )}
+                                  </div>
+                                  <CollapsibleTrigger asChild>
+                                    <Button variant="ghost" size="icon">
+                                      <ChevronDown
+                                        className={`h-4 w-4 transition-transform duration-200 ${
+                                          expandedCourses[course.uuid]
+                                            ? "transform rotate-180"
+                                            : ""
+                                        }`}
+                                      />
+                                    </Button>
+                                  </CollapsibleTrigger>
+                                </div>
                               </div>
-                            )}
-                          </div>
-                        </CardContent>
-                      </Card>
+                            </div>
+                            <CollapsibleContent>
+                              <div className="border-t">
+                                <div className="p-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                  {course.videos?.map((video) =>
+                                    renderVideoCard(video)
+                                  )}
+                                </div>
+                              </div>
+                            </CollapsibleContent>
+                          </CardContent>
+                        </Card>
+                      </Collapsible>
                     ))}
-                  </div>
-                </TabsContent>
-
-                <TabsContent value="videos">
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                    {(paginatedContent as Video[]).map((video) =>
-                      renderVideoCard(video)
-                    )}
                   </div>
                 </TabsContent>
 

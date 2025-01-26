@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 interface Video {
   uuid: string;
+  courseName?: string;
 }
 
 interface Chapter {
@@ -44,6 +45,22 @@ export async function GET(request: Request) {
     }
     const data = (await response.json()) as CourseData;
 
+    // Create a map of video UUIDs to course names
+    const videoToCourseMap = new Map<string, string>();
+    Object.entries(data.videosToCourses).forEach(([courseTitle, content]) => {
+      content.chapters.forEach((chapter) => {
+        chapter.vids.forEach((vid) => {
+          videoToCourseMap.set(vid.uuid, courseTitle);
+        });
+      });
+    });
+
+    // Add course names to videos
+    const videosWithCourses = data.videos.map((video) => ({
+      ...video,
+      courseName: videoToCourseMap.get(video.uuid),
+    }));
+
     // Process courses to include their videos
     const processedCourses = data.courses.map((course) => {
       const courseVideos: Video[] = [];
@@ -54,7 +71,7 @@ export async function GET(request: Request) {
       if (courseContent) {
         courseContent[1].chapters.forEach((chapter) => {
           chapter.vids.forEach((vid) => {
-            const video = data.videos.find((v) => v.uuid === vid.uuid);
+            const video = videosWithCourses.find((v) => v.uuid === vid.uuid);
             if (video) {
               courseVideos.push(video);
             }
@@ -72,6 +89,7 @@ export async function GET(request: Request) {
     return NextResponse.json({
       ...data,
       courses: processedCourses,
+      videos: videosWithCourses,
     });
   } catch (error) {
     return NextResponse.json(
