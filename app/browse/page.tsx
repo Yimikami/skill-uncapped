@@ -203,16 +203,18 @@ export default function BrowsePage() {
         (roleFilter === "ALL" ||
           course.role.toLowerCase() === roleFilter.toLowerCase())
     ),
-    commentaries: courseData.commentaries.filter(
-      (commentary) =>
-        commentary.staff.toLowerCase().includes(searchQuery.toLowerCase()) &&
-        (yourChampionFilter === "ANY" ||
-          commentary.yourChampion?.toLowerCase() ===
-            yourChampionFilter.toLowerCase()) &&
-        (theirChampionFilter === "ANY" ||
-          commentary.theirChampion?.toLowerCase() ===
-            theirChampionFilter.toLowerCase())
-    ),
+    commentaries: courseData.commentaries
+      .filter(
+        (commentary) =>
+          commentary.staff.toLowerCase().includes(searchQuery.toLowerCase()) &&
+          (yourChampionFilter === "ANY" ||
+            commentary.yourChampion?.toLowerCase() ===
+              yourChampionFilter.toLowerCase()) &&
+          (theirChampionFilter === "ANY" ||
+            commentary.theirChampion?.toLowerCase() ===
+              theirChampionFilter.toLowerCase())
+      )
+      .sort((a, b) => b.rDate - a.rDate),
   };
 
   const totalPages = Math.ceil(
@@ -439,7 +441,9 @@ export default function BrowsePage() {
           className="w-full aspect-video object-cover"
           onError={(e) => {
             const target = e.target as HTMLImageElement;
-            target.src = `https://placehold.co/600x400?text=${encodeURIComponent(video.title)}`;
+            target.src = `https://placehold.co/600x400?text=${encodeURIComponent(
+              video.title
+            )}`;
           }}
         />
         <div className="p-4 space-y-4">
@@ -516,7 +520,9 @@ export default function BrowsePage() {
           className="w-full aspect-video object-cover"
           onError={(e) => {
             const target = e.target as HTMLImageElement;
-            target.src = `https://placehold.co/600x400?text=${encodeURIComponent(`Commentary by ${commentary.staff}`)}`;
+            target.src = `https://placehold.co/600x400?text=${encodeURIComponent(
+              `Commentary by ${commentary.staff}`
+            )}`;
           }}
         />
         <div className="p-4 space-y-4">
